@@ -1,6 +1,7 @@
 
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -13,14 +14,14 @@ var builder = WebApplication.CreateBuilder(args);
 var connection = builder.Configuration.GetConnectionString("Default")
     ?? "Host=localhost;Port=5432;Database=trustvault;Username=trustvault;Password=change-this-password";
 
-// JWT SECRET FROM USER SECRETS
+// JWT SECRET
 var jwtKey = builder.Configuration["Jwt:Key"];
 
 if (string.IsNullOrWhiteSpace(jwtKey) ||
     Encoding.UTF8.GetByteCount(jwtKey) < 32)
 {
     throw new InvalidOperationException(
-        "JWT key is missing or too short. Configure Jwt:Key using User Secrets.");
+        "JWT key is missing or too short.");
 }
 
 // DATABASE
@@ -42,8 +43,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-
-
 // JWT AUTHENTICATION
 builder.Services.AddAuthentication(
     JwtBearerDefaults.AuthenticationScheme)
@@ -56,10 +55,8 @@ builder.Services.AddAuthentication(
                 ValidateAudience = false,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-
                 IssuerSigningKey = new SymmetricSecurityKey(
                     Encoding.UTF8.GetBytes(jwtKey)),
-
                 ClockSkew = TimeSpan.Zero
             };
     });
@@ -90,6 +87,76 @@ using (var scope = app.Services.CreateScope())
 // HEALTH CHECK
 app.MapGet("/api/health", () =>
     Results.Ok(new { status = "ok" }));
+
+// FIRST ADMIN SETUP - ONE TIME ONLY
+app.MapPost("/api/setup/first-admin", async (
+    CreateUserRequest request,
+    HttpRequest httpRequest,
+    IConfiguration configuration,
+    AppDb db) =>
+{
+    var configuredKey =
+        configuration["AdminBootstrap:Key"];
+
+    if (string.IsNullOrWhiteSpace(configuredKey) ||
+        Encoding.UTF8.GetByteCount(configuredKey) < 32)
+    {
+        return Results.NotFound();
+    }
+
+    var suppliedKey =
+        httpRequest.Headers["X-Admin-Bootstrap-Key"].ToString();
+
+    var expectedBytes = Encoding.UTF8.GetBytes(configuredKey);
+    var suppliedBytes = Encoding.UTF8.GetBytes(suppliedKey);
+
+    if (expectedBytes.Length != suppliedBytes.Length ||
+        !CryptographicOperations.FixedTimeEquals(
+            expectedBytes, suppliedBytes))
+    {
+        return Results.Unauthorized();
+    }
+
+    if (await db.Users.AnyAsync(x => x.Role == "Admin"))
+    {
+        return Results.Conflict(
+            "An Admin account already exists.");
+    }
+
+    if (string.IsNullOrWhiteSpace(request.Name) ||
+        string.IsNullOrWhiteSpace(request.Email) ||
+        string.IsNullOrEmpty(request.Password) ||
+        request.Password.Length < 10)
+    {
+        return Results.BadRequest(
+            "Invalid details. Password must be at least 10 characters.");
+    }
+
+    var email = request.Email.Trim().ToLowerInvariant();
+
+    if (await db.Users.AnyAsync(x => x.Email == email))
+    {
+        return Results.BadRequest(
+            "Email already registered.");
+    }
+
+    var admin = new User
+    {
+        Name = request.Name.Trim(),
+        Email = email,
+        PasswordHash =
+            BCrypt.Net.BCrypt.HashPassword(request.Password),
+        Role = "Admin"
+    };
+
+    db.Users.Add(admin);
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new
+    {
+        message = "First Admin created successfully."
+    });
+});
 
 // REGISTER
 app.MapPost("/api/auth/register", async (
