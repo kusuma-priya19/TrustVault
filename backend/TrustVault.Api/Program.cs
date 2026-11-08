@@ -33,11 +33,16 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Frontend", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173")
+            .WithOrigins(
+                "http://localhost:5173",
+                "https://trustvault-web.onrender.com"
+            )
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
+
+
 
 // JWT AUTHENTICATION
 builder.Services.AddAuthentication(
