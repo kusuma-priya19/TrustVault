@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:17
+    container_name: trustvault-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trustvault
+      POSTGRES_USER: trustvault
+      POSTGRES_PASSWORD: change-this-password
+    ports: ["5432:5432"]
+    volumes: ["trustvault_data:/var/lib/postgresql/data"]
+volumes:
+  trustvault_data:

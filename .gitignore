@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/private_uploads/
+.env
+.env.*
+!.env.example
+.vs/
+*.user
+*.suo
+*.tsbuildinfo
