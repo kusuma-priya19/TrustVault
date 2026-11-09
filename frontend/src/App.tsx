@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API = 'https://trustvault-enah.onrender.com/api';
 
 type User = {
   id: string;
