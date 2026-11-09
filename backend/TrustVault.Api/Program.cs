@@ -1,4 +1,3 @@
-
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -36,7 +35,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins(
                 "http://localhost:5173",
-                "https://trustvault-web.onrender.com"
+                "https://trustvault-web.onrender.com",
+                "https://trustvault-web-jx29.onrender.com"
             )
             .AllowAnyHeader()
             .AllowAnyMethod();
